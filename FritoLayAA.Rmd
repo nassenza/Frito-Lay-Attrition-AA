@@ -1,0 +1,681 @@
+---
+title: "Always Analytics Frisco Lay Employee Retention Consultation"
+author: "Nicole Assenza"
+date: "Setempber 9, 2022"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#####YouTube video link: <https://youtu.be/i5hs0tR_zCo>
+#####RShiny App link: <https://seemantsrivastava.shinyapps.io/Attrition/>
+#####GitHub repository link: <https://github.com/nassenza>
+
+
+###Introduction:
+####As a consultant for Always Analytics our team has worked hard to answer important questions: What the facot contributing to employee attrition? What factorsimpact the decisions of these employees to leave Frito Lay? Is salary too low? Job satisfaction leaving something to be desired? Is it a company culure issue where employees don't feel the work/life balance is unsatisfactory? The results might surprise you. We have completed the analysis of the dataset on employee attrition dataset you've provided. Hopefully this will help your HR department greatly in improving employee rentention rates. We've explored the data and built a model to predict what factors contribute to employees leaving the company or staying on. The datset provided has great wealth of info regarding 870 employees who've either chosen to quit or stay with the company. Thre are 36 features we've investigated to see which ones are most meaningful and impactful.
+```{r message=FALSE, warning=FALSE}
+# Load Libraries
+library(dplyr)      # for string functions
+library(ggplot2)    # for plots
+library(kableExtra) # for table formatting
+library(knitr)      # for presenting in html
+library(Hmisc)      # for describing data
+library(caret)      # for classification & regression training
+library(mlr)        # for machine learing
+library(class)      # for classification funtions
+library(corrplot)   # for correlation matrix
+library(data.table) # for table creation for using one_hot
+library(mltools)    # for one_hot dummy creation
+library(gridExtra)
+library(tidyr)
+library(ggthemes)
+library(GGally)
+library(e1071)
+library(mice)
+library(VIM)
+library(ggmap)
+library(maps)
+library(mapdata)
+library(sp)
+library(maptools)
+library(readr)
+library(car)
+library(MASS)
+library(ROCR)
+# for plots formatting  
+```
+
+##Here, we merge the data, start training and validate it and clean it up!
+```{r echo = TRUE}
+# Read employee data from the training csv file and name the dataset train.
+train <- read.csv("C:/Users/ASUSL/OneDrive/Desktop/CASETSTUDY THE LASTONE/CaseStudy2-data.csv",header=TRUE,stringsAsFactors = TRUE,sep=",",encoding = "UTF-8")
+
+# Read employee data from the validation csv file and names the dataset train.
+validation <- read.csv("C:/Users/ASUSL/OneDrive/Desktop/CASETSTUDY THE LASTONE/CaseStudy2Validation.csv",header=TRUE,stringsAsFactors = TRUE,sep=",",encoding = "UTF-8")
+alldata = rbind(train,validation) # create dataframe with all data to clean all at same time
+```
+
+
+##Initial Exploration
+###Summary: No missing data, which makes our job easier. One thing to note is that 84% of employees did choose to stay at Frito Lay. Which also means that fewer people quit, which is a bit tricky with lack of documentation of attrited employees but good for Frito which means, generally people are happy with their jobs.Next we will check for any missing/ not available values. We hhave 
+
+##EDA (Exploratory Data Analysis):
+##Before we start modelling, we really need to explore the data and play around with the information to see what jumps out at us as possibly leading to some insights.What data correlates? What doesn't? We will answer those questions here.Some obvious ones come to mind: Older employees who keep the same job will have more working hours/years and income, for example, as well as having the same boss during that time. Let's see if that holds true.
+
+There are 1170 observations with 37 variables (9 factors, 27 integers, 1 random number)
+
+The following initial assessments/actions were completed:<br>
+- Reviewed the data to confirm factor/categorical variable values exist in both.<br>
+- Removed variables where all values are the same: StandardHours, EmployeeCount, Over18<br>
+- Removed unrelated variable Rand<br>
+- Recoded Attrition to 0=No, 1=Yes<br>
+
+We classified the variables into 4 areas:
+<ul> <li> Demographics: Age, Gender, Marital Status, Education, Education Level and Distance from home (commute)
+<li> Attitudinal: Environmental Satisfaction, Job Satisfaction, Relationship Satisfaction, WorkLifeBalance,Job Involvement, Performance Rating 
+<li> Work Demographics: Job ROle, Job Level, Business Travel, Department, Training 
+<li> Financial: Hourly Rate (rates are collinear so showing only hourly rate), Overtime, Percent Salary Hike, Stock Option Levels
+</li> </ul>
+
+```{r DE}
+# HMisc provides more details than str(alldata)
+str(alldata)
+describe(alldata, digits = 2, tabular = TRUE)
+# There are 1170 observations with 37 variables (9 factors, 27 integers, 1 random number)
+# Reviewed train and validate data to confirm factor/categorical variable values exist in both
+# Remove variables where all values are the same: StandardHours, EmployeeCount, Over18
+# Remove unrelated variable
+
+##Manually created data dictionary based on results below with a notes field
+DataDict <- read.csv("C:/Users/ASUSL/OneDrive/Desktop/CASETSTUDY THE LASTONE/Datadictionary.csv",header=TRUE,sep=",",encoding = "UTF-8")
+```
+##Interesting, Age, YearsatCompany, YearsinCurrentRole, YearswithCurrentManager, and TotalWorkingYears, Hourly Rate seem to be negatively correlated. Interesting! Now let's look at who's leaving, as you can see from the chart mostare happy staying at the company.
+
+#### Income in a major factor in levels of attrition, strangely enough the employees with higher salaries tend to stay. As we get into the 500-1000 montly income range, attrition sees a huge spike.
+#### Next, we take a look at attrition levels in certrain departments.
+
+#### Data doesn't lie: Sales and R%D have very high attrition rates: 53.57% and 41.14% respectively.HR has low attrition rates at around 4%.
+##### In the next graph, HR, R&D and Sales have good retention rates.
+
+#### Is this a relationship between gettng married and quitting a job? It would be interesting to see that broken down by gender. However, it doesn't seem very relavent to attrition rates.We can most likely to remove this as a key factor.
+
+####Attrition/Marital Status/AgE/ monthly income:
+#### Single people at any age seem to quit more, while the married regardless of age stay on and even divorced people tend to quit less.Salary is a large indicator for married people since they might (this is speculation) have families to support and require a higher paying salary or a more balanced relationship between work and home life. Single people are unattached so maybe they want to keep their options open.
+
+####Attrition Vs Distance From Home:
+##### Suprisingly, attrition rates decrease as the distance from home to office increase. 
+
+
+####Attrition Vs Payrates:
+##### With the employees who quit, median monthly incomes are much less than those who stay employeed at Frito Lay. If you're making 5000 or less a much, I can somewhat understand looking for other opportunities. Although that's a very decent wage if you ask me.
+
+####Attrition Vs Education:
+
+#### Regardless of education levels, very few employees quit. Somewhat surprising results. The highest attrition rates are those with Bachelor's degrees, and also the highest rentention rates. This may have something to do with the fact that there are many, many people with Bachelor's degrees. 
+```{r echo = TRUE}
+# Mutate for EDA
+
+plotalldata <- alldata %>% mutate( 
+Age = as.factor 
+(ifelse(Age %in% 0:21,"Gen Z", ifelse(Age %in% 22:37,"Millenial", 
+ifelse(Age %in% 38:53,"Gex X", ifelse(Age %in% 54:72,"Boomers", 
+                                      "Silent"))))),
+
+DistanceFromHome = as.factor                                                                  
+(ifelse(DistanceFromHome %in% 0:2,"<= 2 miles", ifelse(DistanceFromHome %in% 3:5,"3-5 miles", 
+ ifelse(DistanceFromHome %in% 6:10,"6-9 miles", ifelse(DistanceFromHome  %in% 10:15,"10-15 miles",
+">= 16 miles"))))),
+
+Education = as.factor                                                            #Source lastresearch project, best estimate of values
+(ifelse(Education == 1,"HS Grad", ifelse(Education == 2, "Some College", 
+ifelse(Education == 3, "College Grad", ifelse(Education == 4, "Some Post Grad",
+"Post Grad"))))),
+  
+EnvironmentSatisfaction = as.factor                                              #4 point Likert, best estimate of values
+(ifelse(EnvironmentSatisfaction == 1, "Low",ifelse(EnvironmentSatisfaction == 2, "Med", 
+ifelse(EnvironmentSatisfaction == 3, "High", "Very High")))),
+
+JobInvolvement = as.factor                                                       #4 point Likert, best estimate of values
+(ifelse(JobInvolvement == 1, "Low",ifelse(JobInvolvement == 2, "Med",
+ifelse(JobInvolvement == 3, "High","Very High")))),
+
+JobLevel = as.factor                                                             #5 point Scale estimate of values
+(ifelse(JobLevel == 1, "Contributor",ifelse(JobLevel == 2, "Supervisor",
+ifelse(JobLevel == 3, "Manager",ifelse(JobLevel == 4, "Director",
+"Co Leadership"))))),
+
+JobSatisfaction = as.factor                                                      #4 point Likert, best estimate of values
+(ifelse(JobSatisfaction == 1, "Low",ifelse(JobSatisfaction == 2, "Med",
+ifelse(JobSatisfaction == 3, "High","Very High")))),
+
+PerformanceRating = as.factor                                                    #4 point Likert, best estimate of values
+(ifelse(PerformanceRating == 1, "Low",ifelse(PerformanceRating == 2, "Med",
+ifelse(PerformanceRating == 3, "High", "Very High")))),
+
+RelationshipSatisfaction = as.factor                                             #4 point Likert, best estimate of values
+(ifelse(RelationshipSatisfaction == 1, "Low",ifelse(RelationshipSatisfaction == 2, "Med",
+ifelse(RelationshipSatisfaction == 3, "High", "Very High")))),
+
+WorkLifeBalance = as.factor                                                      #4 point Likert, best estimate of values
+(ifelse(WorkLifeBalance == 1, "Low",ifelse(WorkLifeBalance == 2, "Med",
+ifelse(WorkLifeBalance == 3, "High", "Very High"))))
+)
+```
+
+In the demographic data, it is as expected
+```{R echo = TRUE} 
+#Demographics
+
+#Plot Counts for High Level View
+#Demographics: Age, Gender, Marital Status, Education, Education Level and Distance from home (commute)
+
+AgePlot <- plotalldata %>% group_by(Age) %>%  summarise(counts = n()) %>%
+  ggplot(aes(x = as.factor(Age), y = counts)) +
+  geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+  ggtitle("Age") + ylab("Count") + theme_minimal() +       
+  geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+GenderPlot <- plotalldata %>%   group_by(Gender) %>%  summarise(counts = n()) %>%
+  ggplot(aes(x = as.factor(Gender), y = counts)) +
+  geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+  ggtitle("Gender") + ylab("Count") + theme_minimal() +       
+  geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+MaritalStatusPlot <- plotalldata %>%   group_by(MaritalStatus) %>%  summarise(counts = n()) %>%
+  ggplot(aes(x = as.factor(MaritalStatus), y = counts)) +
+  geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+  ggtitle("MaritalStatus") + ylab("Count") + theme_minimal() +       
+  geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+EducationPlot <- plotalldata %>% group_by(Education) %>%  summarise(counts = n()) %>%
+  ggplot(aes(x = as.factor(Education), y = counts)) +
+  geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+  ggtitle("Education") + ylab("Count") + theme_minimal() +       
+  geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) +
+  theme(axis.text.x=element_text(angle=70,vjust=.7,hjust=1))
+
+EducationFieldPlot <- plotalldata %>%   group_by(EducationField) %>%  summarise(counts = n()) %>%
+  ggplot(aes(x = as.factor(EducationField), y = counts)) +
+  geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+  ggtitle("EducationField") + ylab("Count") + theme_minimal() +       
+  geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) +
+  theme(axis.text.x=element_text(angle=70,vjust=.7,hjust=1))
+
+CommutePlot <- plotalldata %>%   group_by(DistanceFromHome) %>%  summarise(counts = n()) %>%
+  ggplot(aes(x = as.factor(DistanceFromHome), y = counts)) +
+  geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+  ggtitle("Commute") + ylab("Count") + theme_minimal() +       
+  geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) +
+  theme(axis.text.x=element_text(angle=70,vjust=.8,hjust=1))
+
+grid.arrange(AgePlot, GenderPlot, MaritalStatusPlot, EducationPlot, EducationFieldPlot,CommutePlot, nrow = 2, ncol = 3)
+```
+
+
+```{r echo = TRUE}
+#Attitudinal
+
+#Plot Counts for High Level View
+#Attitudinal: Environmental Satisfaction, Job Satisfaction, Relationship Satisfaction, WorkLifeBalance,Job Involvement, Performance Rating 
+
+EnvironSatPlot <- plotalldata %>%  group_by(EnvironmentSatisfaction) %>%  summarise(counts = n()) %>%
+    ggplot(aes(x = as.factor(EnvironmentSatisfaction), y = counts)) +
+    geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+    ggtitle("EnvironmentSatisfaction") + ylab("Count") + theme_minimal() +       
+    geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+JobSatPlot <- plotalldata %>%   group_by(JobSatisfaction) %>%  summarise(counts = n()) %>%
+    ggplot(aes(x = as.factor(JobSatisfaction), y = counts)) +
+    geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+    ggtitle("JobSatisfaction") + ylab("Count") + theme_minimal() +       
+    geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+RelatSatPlot <- plotalldata %>%  group_by(RelationshipSatisfaction) %>%  summarise(counts = n()) %>%
+   ggplot(aes(x = as.factor(RelationshipSatisfaction), y = counts)) +
+   geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+   ggtitle("RelationshipSatisfaction") + ylab("Count") + theme_minimal() +       
+   geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+WoLiBaPlot <- plotalldata %>%  group_by(WorkLifeBalance) %>%  summarise(counts = n()) %>%
+    ggplot(aes(x = as.factor(WorkLifeBalance), y = counts)) +
+    geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+    ggtitle("WorkLifeBalance") + ylab("Count") + theme_minimal() +       
+    geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+JobInvPlot <- plotalldata %>%   group_by(JobInvolvement) %>%  summarise(counts = n()) %>%
+    ggplot(aes(x = as.factor(JobInvolvement), y = counts)) +
+    geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+    ggtitle("JobInvolvement") + ylab("Count") + theme_minimal() +       
+    geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+  
+PerfRatingPlot <- plotalldata %>%  group_by(PerformanceRating) %>%  summarise(counts = n()) %>%
+    ggplot(aes(x = as.factor(PerformanceRating), y = counts)) +
+    geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+    ggtitle("PerformanceRating") + ylab("Count") + theme_minimal() +       
+    geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+grid.arrange(EnvironSatPlot, JobSatPlot, RelatSatPlot, WoLiBaPlot, JobInvPlot, PerfRatingPlot, nrow = 2, ncol = 3)
+```
+
+```{r echo = TRUE}
+#Plot Counts for High Level View
+#Work Demographics: Job ROle, Job Level, Business Travel, Department, Training 
+#distribution of work demo details. Expect Right tail.
+
+JobLevelPlot <- plotalldata %>%   group_by(JobLevel) %>%  summarise(counts = n()) %>%
+    ggplot(aes(x = as.factor(JobLevel), y = counts)) +
+    geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+    ggtitle("JobLevel") + ylab("Count") + theme_minimal() +       
+    geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) +
+  theme(axis.text.x=element_text(angle=70,vjust=.8))
+
+JobRolePlot <- plotalldata %>%   group_by(JobRole) %>%  summarise(counts = n()) %>%
+    ggplot(aes(x = as.factor(JobRole), y = counts)) +
+    geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+    ggtitle("JobRole") + ylab("Count") + theme_minimal() +       
+    geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) +
+  theme(axis.text.x=element_text(angle=60,vjust=.8,hjust=.5)) 
+
+BusinessTravelPlot <-  plotalldata %>%   group_by(BusinessTravel) %>%  summarise(counts = n()) %>%
+    ggplot(aes(x = as.factor(BusinessTravel), y = counts)) +
+    geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+    ggtitle("BusinessTravel") + ylab("Count") + theme_minimal() +       
+    geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+DepartmentPlot <-  plotalldata %>%   group_by(Department) %>%  summarise(counts = n()) %>%
+    ggplot(aes(x = as.factor(Department), y = counts)) +
+    geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+    ggtitle("Department") + ylab("Count") + theme_minimal() +       
+    geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) +
+  theme(axis.text.x=element_text(angle=70,vjust=.8,hjust=.5))
+
+TrainingPlot <-  plotalldata %>%   group_by(TrainingTimesLastYear) %>%  summarise(counts = n()) %>%
+    ggplot(aes(x = as.factor(TrainingTimesLastYear), y = counts)) +
+    geom_bar(stat = 'identity', fill = "light blue",col = "white") +
+    ggtitle("TrainingTimesLastYear") + ylab("Count") + theme_minimal() +       
+    geom_text(aes(label=counts), size = 2.5, position=position_dodge(width=0.3), vjust=-0.25) +
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank())
+
+YearsAtCompanyPlot <- ggplot(plotalldata) + 
+  geom_histogram(aes(YearsAtCompany), binwidth = 1, fill = "light blue",col = "white") + 
+  ggtitle("YearsAtCompany") + ylab("Count") + theme_minimal()+       
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank())                           # add main & axis titles
+
+YearsInCurrentRolePlot <- ggplot(plotalldata) + 
+  geom_histogram(aes(YearsInCurrentRole), binwidth = 1, fill = "light blue",col = "white") + 
+  ggtitle("YearsInCurrentRole") + ylab("Count") + theme_minimal() +                                 # add main & axis titles
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+  
+YearsSinceLastPromotionPlot <- ggplot(plotalldata) + 
+  geom_histogram(aes(YearsSinceLastPromotion), binwidth = 1, fill = "light blue",col = "white") + 
+  ggtitle("YearsSinceLastPromotion")+ ylab("Count") + theme_minimal() +                             # add main & axis titles
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+YearsWithCurrManagerPlot<- ggplot(plotalldata) + 
+  geom_histogram(aes(YearsWithCurrManager), binwidth = 1, fill = "light blue",col = "white") + 
+  ggtitle("YearsWithCurrManager") + ylab("Count") + theme_minimal() +                               # add main & axis titles
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+grid.arrange(JobLevelPlot, DepartmentPlot, BusinessTravelPlot, JobRolePlot, nrow = 2, ncol = 2)
+grid.arrange(TrainingPlot, YearsAtCompanyPlot, YearsInCurrentRolePlot, YearsSinceLastPromotionPlot,YearsWithCurrManagerPlot,  nrow = 3, ncol = 2)
+```
+
+Financial Plots
+```{r}
+HourlyRatePlot <- ggplot(plotalldata) + 
+  geom_histogram(aes(HourlyRate), binwidth = 1, fill = "light blue",col = "white") + 
+  ggtitle("HourlyRate") + ylab("Count") + theme_minimal()+       
+ theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+OT <- as.data.frame(ifelse(plotalldata [,22] == "Yes", 1, ifelse(plotalldata[,22] == "No", 0, 99)))  # Recode OT with 0s and 1s
+names(OT)<-c("OverTime")
+Overtimeplot <- ggplot(OT) + 
+  geom_histogram(aes(OverTime), binwidth = 1, fill = "light blue",col = "white") + 
+  ggtitle("OverTime") + ylab("Count") + theme_minimal()+       
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+
+PercentSalaryHikePlot <- ggplot(plotalldata) + 
+  geom_histogram(aes(PercentSalaryHike), binwidth = 1, fill = "light blue",col = "white") + 
+  ggtitle("SalaryHike") + ylab("Count") + theme_minimal()+       
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank())
+
+StockOptionPlot <-  ggplot(plotalldata) + 
+  geom_histogram(aes(StockOptionLevel), binwidth = 1, fill = "light blue",col = "white") + 
+  ggtitle("StockOptionPlot") + ylab("Count") + theme_minimal() +       
+  theme(plot.title = element_text(size =10),axis.title.x=element_blank()) 
+grid.arrange( HourlyRatePlot, Overtimeplot, PercentSalaryHikePlot, StockOptionPlot, nrow = 2, ncol = 2)
+```
+
+Demographic Attrition Plots
+```{r echo = TRUE}
+# Attrition by Age
+percentData <- plotalldata %>% group_by(Age) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(plotalldata,aes(x=Age,fill=Attrition)) +
+  ggtitle("Attrition by Age") + ylab("Count") +                                             # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+# Attrition by Gender
+percentData <- alldata %>% group_by(Gender) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=Gender,fill=Attrition)) +
+  ggtitle("Attrition by Gender") + ylab("Count") +                                          # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+# Attrition by Marital Status
+percentData <- alldata %>% group_by(MaritalStatus) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=MaritalStatus,fill=Attrition)) +
+  ggtitle("Attrition by Marital Status") + ylab("Count") +                                  # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+# Attrition by Education
+percentData <- alldata %>% group_by(Education) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=Education,fill=Attrition)) +
+  ggtitle("Attrition by Education") + ylab("Count") +                                       # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+# Attrition by Education Field
+percentData <- alldata %>% group_by(EducationField) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=EducationField,fill=Attrition)) +
+  ggtitle("Attrition by Education Field") + ylab("Count") +                                 # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5)) +      # % labels
+  theme(axis.text.x=element_text(angle=70,hjust=1))
+
+# Attrition by Commute
+percentData <- plotalldata %>% group_by(DistanceFromHome) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(plotalldata,aes(x=DistanceFromHome,fill=Attrition)) +
+  ggtitle("Attrition by Commute") + ylab("Count") +                                         # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+```
+
+Attitudinal Attrition Plots
+```{r}
+# Attrition by Environmental Satisfaction
+percentData <- alldata %>% group_by(EnvironmentSatisfaction) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=EnvironmentSatisfaction,fill=Attrition)) +
+  ggtitle("Attrition by Environmental Satisfaction") + ylab("Count") +                      # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+# Attrition by Job Involvement
+percentData <- alldata %>% group_by(JobInvolvement) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=JobInvolvement,fill=Attrition)) +
+  ggtitle("Attrition by Job Involvement") + ylab("Count") +                                 # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+# Attrition by Job Satisfaction
+percentData <- alldata %>% group_by(JobSatisfaction) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=JobSatisfaction,fill=Attrition)) +
+  ggtitle("Attrition by Job Satisfaction") + ylab("Count") +                                # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+# Attrition by Performance Rating
+percentData <- alldata %>% group_by(PerformanceRating) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=PerformanceRating,fill=Attrition)) +
+  ggtitle("Attrition by Performance Rating") + ylab("Count") +                              # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels      
+```
+
+Work Attrition Plots
+```{r echo = TRUE}
+par(mfrow=c(1,3))
+# Attrition by Department
+percentData <- alldata %>% group_by(Department) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=Department,fill=Attrition)) +
+  ggtitle("Attrition by Department") + ylab("Count") +                                      # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+# Attrition by Job Role
+percentData <- alldata %>% group_by(JobRole) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=JobRole,fill=Attrition)) +
+  ggtitle("Attrition by Job Role") + ylab("Count") +                                        # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5)) +      # % labels
+  theme(axis.text.x=element_text(angle=70,hjust=1))
+
+# Attrition by Job Level
+percentData <- alldata %>% group_by(JobLevel) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=JobLevel,fill=Attrition)) +
+  ggtitle("Attrition by Job Level") + ylab("Count") +                                       # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+# Attrition by Travel
+percentData <- alldata %>% group_by(BusinessTravel) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+aTravel<-ggplot(alldata,aes(x=BusinessTravel,fill=Attrition)) +
+  ggtitle("Attrition by Business Travel") + ylab("Count") +                                 # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+```
+
+Financial Attrition Plots
+```{r echo = TRUE}
+# Attrition by Overtime
+percentData <- alldata %>% group_by(OverTime) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=OverTime,fill=Attrition)) +
+  ggtitle("Attrition by OverTime") + ylab("Count") +                                        # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+# Attrition by Percent Salary Hike
+percentData <- alldata %>% group_by(PercentSalaryHike) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=PercentSalaryHike,fill=Attrition)) +
+  ggtitle("Attrition by % Salary Hike") + ylab("Count") +                                        # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+# Attrition by Percent Salary Hike
+percentData <- alldata %>% group_by(StockOptionLevel) %>% count(Attrition) %>%
+  mutate(ratio=scales::percent(n/sum(n)))
+ggplot(alldata,aes(x=StockOptionLevel,fill=Attrition)) +
+  ggtitle("Attrition by Stock Option Level") + ylab("Count") +                                        # add main & axis titles
+  scale_fill_brewer(palette="Paired",direction=-1)+ theme_minimal() +                       # change color palette
+  geom_bar(aes(y = (..count..)),position=position_dodge()) +                                # side-by-side bars
+  geom_bar(aes(y = (..count..))) +                    
+  geom_text(data=percentData,aes(y=n,label=ratio),position=position_stack(vjust=.5))        # % labels
+
+``` 
+
+<H4>Feature Analysis</H4>
+Correlation plots provide a quick way to identify correlation between variables. You want correlation with Attrition but you want to be careful about including variables that are collinear with each other since they can negatively affect the model. Selecting the optimal features requires an iteration between initial EDA, review of collinearity plots, variable inflation factors, variable p-values, model output.
+
+Here we show collinearity plots. We recoded Attrition and used dummy variables for the categorical data and applied the corrplot function (since it uses only numerical data). In order to see the plots clearer, we split the data into 5 different different plots but keeping Attrition in each plot.
+```{r echo = TRUE}
+# Split data to create 2 correlation matrices, more readable
+data<-alldata[,-c(10,11,23,28,37)]                                                # remove EmpCount, Emp #, Over18, StdHrs,Rand
+data$Attrition <- ifelse(data [,3] == "Yes", 1, ifelse(data[,3] == "No", 0, 99))  # Recode Attrition with 0s and 1s
+data <- one_hot(as.data.table(data))                                              # Create dummy vars for categories
+
+# Looking for linear relationships so will not normaalize
+data_n <- lapply(data,normalize)                                                 # normalize numeric data
+data.frame(data_n)                                                       # create dataframe of normalized data
+
+# create sets of data for corr plot viewing
+data1<-data[,c(1:10)]
+data2<-data[,c(1,3,11:20)]
+data3<-data[,c(1,3,21:30)]
+data4<-data[,c(1,3,31:41)]
+data5<-data[,c(1,3,42:50)]
+
+M_df1 <- select_if(data1, is.numeric)                                              # get all numeric data
+M1 <- cor(M_df1)                                                                   # convert to matrix
+corrplot(M1, order="hclust",addrect=2)                                             # Display the correlation coefficient
+
+M_df2 <- select_if(data2, is.numeric)                                              # get all numeric data
+M2 <- cor(M_df2)                                                                   # convert to matrix
+corrplot(M2, order="hclust",addrect=2)                                             # Display the correlation coefficient
+
+M_df3 <- select_if(data3, is.numeric)                                              # get all numeric data
+M3 <- cor(M_df3)                                                                   # convert to matrix
+corrplot(M3, order="hclust",addrect=2)                                             # Display the correlation coefficient
+
+M_df4 <- select_if(data4, is.numeric)                                              # get all numeric data
+M4 <- cor(M_df4)                                                                   # convert to matrix
+corrplot(M4, order="hclust",addrect=2)                                             # Display the correlation coefficient
+
+M_df5 <- select_if(data5, is.numeric)                                              # get all numeric data
+M5 <- cor(M_df5)                                                                   # convert to matrix
+corrplot(M5, order="hclust",addrect=2)                                             # Display the correlation coefficient
+```
+
+
+<H4>Data Preparation</H4>
+We chose the KNN model due to it's non-parametric technique and it provides a classification output which matches our overall goal with predicting attrition. The algorithm assumes that similar things exist in close proximity. Because of this assumption, the data must be normalized for proximity determination.
+```{r echo = TRUE}
+# function to normalize data for KNN
+normalize <- function(x) {
+  y <- (x-min(x))/(max(x)-min(x))
+  y
+}
+
+# Create dummy vars for categories
+train.dummies <- one_hot(as.data.table(train))
+val.dummies  <- one_hot(as.data.table(validation))
+
+# Normalize the data
+train_n <- lapply(train.dummies[,c(2,9,10,11,12,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,45,46,47,48,49,51,52,53,54,55,56,57,58)],normalize)                   
+val_n <- lapply(val.dummies[,c(2,9,10,11,12,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,45,46,47,48,49,51,52,53,54,55,56,57,58)],normalize)
+
+dfTrain <- data.frame(train_n)                        # create dataframe of normalized data
+dfVal <- data.frame(val_n)
+
+rownames(dfTrain) <- train$ID                         # add IDs
+rownames(dfVal) <- validation$ID
+
+train.attrition <- train$Attrition                    # isolate attrition
+val.attrition <- validation$Attrition
+
+names(train.attrition) <- train$ID                    # add IDs
+names(val.attrition) <- validation$ID
+
+#dfTrain[1:4]                                         # check normalized data
+#dfVal[1:4]
+
+valIDs <- rownames(dfVal)                             # IDs used below
+
+print("Check Training & Validation Attrition Data")
+train.attrition[1:10]                                 # check data
+val.attrition[1:10]
+```
+
+<h4> Execution of Model and Results</h4>
+The KNN algorithm allows you to select the number of nearest neighbors for classification. Our goal was not only to obtain a high accuracy rate but achieve the best specificity as well. Our goal was to achieve greater than 80% accuracy and 50% for specificity. Using a k=3 and the selected features, were able to meet those goals. Our accuracy is 84.7% having a 95% confidence interval of (80%, 88%) with specificity of 57%.
+```{r echo = TRUE}
+k<-3
+predKNN <- knn(dfTrain,dfVal,cl=train.attrition,k)            # run knn model
+dfPred <- data.frame(predKNN)                                 # store predictions
+confusionMatrix(table(val.attrition,predKNN))                 # confusion matrix
+```
+
+Logistic Regression Model is another classification model that works well with both continusous and discrete data like KNN. The package selected provide a nice table making it easy to idenfity significant factors using p-values. The top variables include Commute, Environmental Satisfaction, Overtime, Job Involvement, Work Life Balance, Business Travel and Years Since Last Promotion. 
+```{r echo=TRUE}
+logreg<-glm(Attrition~Age+BusinessTravel+Department+DistanceFromHome+Education+EducationField+EnvironmentSatisfaction+Gender+JobInvolvement+JobLevel+JobRole+JobSatisfaction+MaritalStatus+MonthlyIncome+NumCompaniesWorked+OverTime+PercentSalaryHike+PerformanceRating+RelationshipSatisfaction+StockOptionLevel+TotalWorkingYears+TrainingTimesLastYear+WorkLifeBalance+YearsAtCompany+YearsInCurrentRole+YearsSinceLastPromotion+YearsWithCurrManager, data=train,family=binomial(link='logit'))
+```  
+
+Apply training data to Logistic Regression model. The logistic regression model improves upon the KNN model with an accuracy of 87.7% having a 95% confidence interval of (83%, 91%) with specificity of 80%.
+```{r echo=TRUE}
+# Store the probabilites for every observation in the dataset 
+logreg.prob <- predict(logreg, validation, type = "response")
+
+# Tranform the "Yes" and "No" to binary variables
+test.logreg <- validation  %>% mutate(model_pred = 1*(logreg.prob > .50) + 0,visit_binary = 1*(Attrition == "Yes") + 0)
+
+# Determine the accuracy of our model
+test.logreg <- test.logreg %>% mutate(accurate = 1*(model_pred == visit_binary))
+sum(test.logreg$accurate)/nrow(test.logreg)                                  # Accuracy Score
+val.attrition <- ifelse(val.attrition == "Yes",1, ifelse(val.attrition == "No",0, 99))      
+
+# Recode Attrition with Yes's and No's
+confusionMatrix(table(val.attrition,test.logreg$model_pred))                 # confusion matrix
+
+dfPred <- data.frame(test.logreg$ID, test.logreg$model_pred)                 # store predictions
+names(dfPred) <- c("ID","Predictions")                                       # rename table columns
+```
+
+```{r echo = TRUE}
+# Output Prediction File
+dfPred <- data.frame(dfPred)                     # create dataframe of normalized data
+dfPred$ID <- valIDs                              # add IDs
+dfPred <- dfPred[,c(1,2)]
+names(dfPred) <- c("ID","PredictedAttrition")
+write.csv2("C:/Users/ASUSL/OneDrive/Desktop/CASETSTUDY THE LASTONE/predictionsfrito.csv")
+
+
+
+```
+
