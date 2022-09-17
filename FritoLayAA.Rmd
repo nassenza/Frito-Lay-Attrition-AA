@@ -5,14 +5,14 @@ date: "Setempber 9, 2022"
 output:
   word_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-#####YouTube video link: <https://youtu.be/i5hs0tR_zCo>
-#####RShiny App link: <https://seemantsrivastava.shinyapps.io/Attrition/>
-#####GitHub repository link: <https://github.com/nassenza>
+
+#####GitHub repository link: <https://github.com/nassenza/Frito-Lay-Attrition-AA>
 
 
 ###Introduction:
@@ -57,6 +57,7 @@ train <- read.csv("C:/Users/ASUSL/OneDrive/Desktop/CASETSTUDY THE LASTONE/CaseSt
 # Read employee data from the validation csv file and names the dataset train.
 validation <- read.csv("C:/Users/ASUSL/OneDrive/Desktop/CASETSTUDY THE LASTONE/CaseStudy2Validation.csv",header=TRUE,stringsAsFactors = TRUE,sep=",",encoding = "UTF-8")
 alldata = rbind(train,validation) # create dataframe with all data to clean all at same time
+
 ```
 
 
@@ -166,9 +167,17 @@ ifelse(WorkLifeBalance == 3, "High", "Very High"))))
 )
 ```
 
-In the demographic data, it is as expected
 ```{R echo = TRUE} 
-#Demographics
+
+ggplot(employee,aes(Age,MonthlyIncome,size=Age,col=factor(Attrition)))+geom_point(alpha=0.3)+theme_minimal()+facet_wrap(~MaritalStatus)+labs(x="Age",y="MonthlyIncome",title="Attrition Level Comparision ",subtitle="How attrition is observed with change in Age,Income and MaritalStatus",col="Attrition")+theme(legend.position="bottom",plot.title=element_text(size=16,hjust=0.5),plot.subtitle = element_text(size=10))+scale_color_brewer(palette="Set2")
+
+ggplot(employee, aes(x = MonthlyIncome, fill = Attrition)) + 
+  geom_density(alpha = 0.6) +
+  labs(x = "Monthly Income", y = "") +
+  ggtitle("Attrition by income level") +
+  theme_classic()
+
+ggplot(employee,aes(x=Attrition,group=Department))+geom_bar(aes(y=..prop..,fill=factor(..x..)),stat="count")+facet_grid(~Department)+theme(axis.text.x=element_text(angle=90,vjust=0.5),legend.position="none",plot.title=element_text(size=16,hjust=0.5))+labs(x="Attrition",y="Percentage",title="Department Vs Attrition %")+ geom_text(aes(label = scales::percent(..prop..), y = ..prop.. ),stat= "count",vjust =-.5) +scale_x_discrete(labels=function(x) str_wrap(x,width=10))+scale_fill_brewer(palette="Set3")
 
 #Plot Counts for High Level View
 #Demographics: Age, Gender, Marital Status, Education, Education Level and Distance from home (commute)
@@ -551,7 +560,7 @@ ggplot(alldata,aes(x=StockOptionLevel,fill=Attrition)) +
 
 ``` 
 
-<H4>Feature Analysis</H4>
+##Feature Analysis
 Correlation plots provide a quick way to identify correlation between variables. You want correlation with Attrition but you want to be careful about including variables that are collinear with each other since they can negatively affect the model. Selecting the optimal features requires an iteration between initial EDA, review of collinearity plots, variable inflation factors, variable p-values, model output.
 
 Here we show collinearity plots. We recoded Attrition and used dummy variables for the categorical data and applied the corrplot function (since it uses only numerical data). In order to see the plots clearer, we split the data into 5 different different plots but keeping Attrition in each plot.
@@ -594,7 +603,7 @@ corrplot(M5, order="hclust",addrect=2)                                          
 ```
 
 
-<H4>Data Preparation</H4>
+#KNN
 We chose the KNN model due to it's non-parametric technique and it provides a classification output which matches our overall goal with predicting attrition. The algorithm assumes that similar things exist in close proximity. Because of this assumption, the data must be normalized for proximity determination.
 ```{r echo = TRUE}
 # function to normalize data for KNN
@@ -623,8 +632,8 @@ val.attrition <- validation$Attrition
 names(train.attrition) <- train$ID                    # add IDs
 names(val.attrition) <- validation$ID
 
-#dfTrain[1:4]                                         # check normalized data
-#dfVal[1:4]
+dfTrain[1:4]                                         # check normalized data
+dfVal[1:4]
 
 valIDs <- rownames(dfVal)                             # IDs used below
 
@@ -633,7 +642,7 @@ train.attrition[1:10]                                 # check data
 val.attrition[1:10]
 ```
 
-<h4> Execution of Model and Results</h4>
+###Execution of Model and Results
 The KNN algorithm allows you to select the number of nearest neighbors for classification. Our goal was not only to obtain a high accuracy rate but achieve the best specificity as well. Our goal was to achieve greater than 80% accuracy and 50% for specificity. Using a k=3 and the selected features, were able to meet those goals. Our accuracy is 84.7% having a 95% confidence interval of (80%, 88%) with specificity of 57%.
 ```{r echo = TRUE}
 k<-3
@@ -642,7 +651,7 @@ dfPred <- data.frame(predKNN)                                 # store prediction
 confusionMatrix(table(val.attrition,predKNN))                 # confusion matrix
 ```
 
-Logistic Regression Model is another classification model that works well with both continusous and discrete data like KNN. The package selected provide a nice table making it easy to idenfity significant factors using p-values. The top variables include Commute, Environmental Satisfaction, Overtime, Job Involvement, Work Life Balance, Business Travel and Years Since Last Promotion. 
+###Logistic Regression Model is another classification model that works well with both continusous and discrete data like KNN. The package selected provide a nice table making it easy to idenfity significant factors using p-values. The top variables include Commute, Environmental Satisfaction, Overtime, Job Involvement, Work Life Balance, Business Travel and Years Since Last Promotion. 
 ```{r echo=TRUE}
 logreg<-glm(Attrition~Age+BusinessTravel+Department+DistanceFromHome+Education+EducationField+EnvironmentSatisfaction+Gender+JobInvolvement+JobLevel+JobRole+JobSatisfaction+MaritalStatus+MonthlyIncome+NumCompaniesWorked+OverTime+PercentSalaryHike+PerformanceRating+RelationshipSatisfaction+StockOptionLevel+TotalWorkingYears+TrainingTimesLastYear+WorkLifeBalance+YearsAtCompany+YearsInCurrentRole+YearsSinceLastPromotion+YearsWithCurrManager, data=train,family=binomial(link='logit'))
 ```  
@@ -674,6 +683,145 @@ dfPred$ID <- valIDs                              # add IDs
 dfPred <- dfPred[,c(1,2)]
 names(dfPred) <- c("ID","PredictedAttrition")
 write.csv2("C:/Users/ASUSL/OneDrive/Desktop/CASETSTUDY THE LASTONE/predictionsfrito.csv")
+
+TrainingSet = read.csv("C:/Users/ASUSL/OneDrive/Desktop/Casestudy2-data.csv")
+
+testSalarySet = read.csv("C:/Users/ASUSL/OneDrive/Desktop/CaseStudy2CompSetNoSalary.csv")
+
+testAttritionSet = read.csv("C:/Users/ASUSL/OneDrive/Desktop/CaseStudy2CompSetNoAttrition.csv") 
+employeeCompSet = read.csv(file = "C:/Users/ASUSL/OneDrive/Desktop/CaseStudy2CompSetNoAttrition.csv", header = TRUE, sep = ",")
+dim(employeeCompSet)
+head(employeeCompSet,4)
+summary(employeeCompSet)
+
+#check for NA values
+table(is.na(employeeCompSet))
+#Checking the missing value
+sapply(employeeCompSet, function(x) sum(is.na(x)))
+#check for duplicated values
+sum(duplicated(employeeCompSet)) 
+#see data frame dimensions and column data types
+str(employeeCompSet)
+
+# remove some variable whose value is not changing. So standard deviation of that variable is zero. So it is not Significant for analysis. Those variable are ID, Employee Count, Employee Number, Over18, StandardHours
+employeeCompSetReduceCols <- employeeCompSet[, -c(1,9,10,22,27)]
+
+employeeCompSet2 <- employeeCompSetReduceCols
+# Changing the class of variable from numeric to factor
+employeeCompSet2$Education <- factor(employeeCompSet2$Education)
+employeeCompSet2$EnvironmentSatisfaction <- factor(employeeCompSet2$EnvironmentSatisfaction)
+employeeCompSet2$JobInvolvement <- factor(employeeCompSet2$JobInvolvement)
+employeeCompSet2$JobLevel <- factor(employeeCompSet2$JobLevel)
+employeeCompSet2$JobSatisfaction <- factor(employeeCompSet2$JobSatisfaction)
+employeeCompSet2$PerformanceRating <- factor(employeeCompSet2$PerformanceRating)
+employeeCompSet2$RelationshipSatisfaction <- factor(employeeCompSet2$RelationshipSatisfaction)
+employeeCompSet2$StockOptionLevel <- factor(employeeCompSet2$StockOptionLevel)
+employeeCompSet2$WorkLifeBalance <- factor(employeeCompSet2$WorkLifeBalance)
+
+# Changing the categorical variables to dummy variable so that the variables can be used for fit in the classification model
+dmy <- dummyVars(" ~ .", data = employeeCompSet2, fullRank=T)
+employeeCompSet3 <- data.frame(predict(dmy, newdata = employeeCompSet2))
+print(str(employeeCompSet3))
+validationdata2 <- employeeCompSet3
+
+# Accessing the predictive ability of the logistic regression model
+log_pred <- predict(logmodel,newdata=validationdata2,type='response')
+log_pred <- ifelse(log_pred>=0.5,1,0)
+# merge predicted variable to the CompSet file
+mergedataemployeeCompSet <- merge(employeeCompSet$ID, log_pred, by=0, all=TRUE) 
+dim(mergedataemployeeCompSet)
+head(mergedataemployeeCompSet,2)
+
+mergedataemployeeCompSet$y <- ifelse(mergedataemployeeCompSet$y == 1,"Yes","No")
+colnames(mergedataemployeeCompSet)[colnames(mergedataemployeeCompSet)=="Row.names"] <- "RowNumber"
+colnames(mergedataemployeeCompSet)[colnames(mergedataemployeeCompSet)=="x"] <- "ID"
+colnames(mergedataemployeeCompSet)[colnames(mergedataemployeeCompSet)=="y"] <- "Attrition"
+classifyemployeeCompSet <- mergedataemployeeCompSet[order(mergedataemployeeCompSet$ID),] %>% dplyr::select(ID, Attrition)
+dim(classifyemployeeCompSet)
+# write to csv file for classifying dataset for the "Competition Set" on Attrition#write.csv(classifyemployeeCompSet, file = "Case2PredictionsAttrition.csv", row.names=FALSE)
+```
+
+###Predicting Monthly Incomes for the "CaseStudy2CompSet No Salary.csv" file using the Linear Regression model:
+#####Linear Regression model on prediting the monthly income attained a RMSE < $3000 for the training and the validation set.
+```{r}
+## Linear Regression model
+
+#Split data into train and test using cross validation in ratio of 70% train and 30% test
+set.seed(2017)
+train <- sample(1:nrow(employee3), nrow(employee3)*.7)
+test = -train
+modeldata <- employee3[train,]
+validationdata <- employee3[test,]
+cat("Train data has", nrow(modeldata),"observations")
+cat("Test data has", nrow(validationdata),"observations")
+
+# Fit the Linear Regression model for predicting monthly incomes (salaries)
+Model1_fit = lm(MonthlyIncome~., data = modeldata)
+summary(Model1_fit)
+confint(Model1_fit)
+
+Model1_Preds = predict(Model1_fit, newdata = validationdata)
+#Accuracy Statistics for the Linear Regression model
+#MSE for the Linear Regression model
+MSE = mean((validationdata$MonthlyIncome - Model1_Preds)^2)
+MSE
+#RMSE (Root Mean square error) for the Linear Regression model
+RMSE = sqrt(MSE)
+RMSE
+
+# load "Competition Set" on No Monthly Incomes dataset having no Salary
+MonthlyIncomeCompSet = read.csv(file = "C:/Users/ASUSL/OneDrive/Desktop/CaseStudy2CompSetNoSalary.csv", header = TRUE, sep = ",")
+dim(MonthlyIncomeCompSet)
+head(MonthlyIncomeCompSet,4)
+summary(MonthlyIncomeCompSet)
+
+#check for NA values
+table(is.na(MonthlyIncomeCompSet))
+#Checking the missing value
+sapply(MonthlyIncomeCompSet, function(x) sum(is.na(x)))
+#check for duplicated values
+sum(duplicated(MonthlyIncomeCompSet)) 
+#see data frame dimensions and column data types
+str(employeeCompSet)
+
+# remove some variable whose value is not changing. So standard deviation of that variable is zero. So it is not Significant for analysis. Those variable are ID, Employee Count, Employee Number, Over18, StandardHours
+MonthlyIncomeCompSetReduceCols <- MonthlyIncomeCompSet[, -c(1,10,11,22,27)]
+
+MonthlyIncomeCompSet2 <- MonthlyIncomeCompSetReduceCols
+# Changing the class of variable from numeric to factor
+MonthlyIncomeCompSet2$Education <- factor(MonthlyIncomeCompSet2$Education)
+MonthlyIncomeCompSet2$EnvironmentSatisfaction <- factor(MonthlyIncomeCompSet2$EnvironmentSatisfaction)
+MonthlyIncomeCompSet2$JobInvolvement <- factor(MonthlyIncomeCompSet2$JobInvolvement)
+MonthlyIncomeCompSet2$JobLevel <- factor(MonthlyIncomeCompSet2$JobLevel)
+MonthlyIncomeCompSet2$JobSatisfaction <- factor(MonthlyIncomeCompSet2$JobSatisfaction)
+MonthlyIncomeCompSet2$PerformanceRating <- factor(MonthlyIncomeCompSet2$PerformanceRating)
+MonthlyIncomeCompSet2$RelationshipSatisfaction <- factor(MonthlyIncomeCompSet2$RelationshipSatisfaction)
+MonthlyIncomeCompSet2$StockOptionLevel <- factor(MonthlyIncomeCompSet2$StockOptionLevel)
+MonthlyIncomeCompSet2$WorkLifeBalance <- factor(MonthlyIncomeCompSet2$WorkLifeBalance)
+# Changing the Atrition variable value to 1 for 'Yes' and 0 for 'No'
+MonthlyIncomeCompSet2$Attrition <- ifelse(MonthlyIncomeCompSet2$Attrition == "Yes",1,0)
+
+# Changing the categorical variables to dummy variable so that the variables can be used for fit in the prediction model
+dmy <- dummyVars(" ~ .", data = MonthlyIncomeCompSet2, fullRank=T)
+MonthlyIncomeCompSet3 <- data.frame(predict(dmy, newdata = MonthlyIncomeCompSet2))
+print(str(MonthlyIncomeCompSet3))
+validationdata2 <- MonthlyIncomeCompSet3
+
+# Accessing the predictive ability of the Linear Regression model on the CompSet dataset
+MonthlyIncomeCompSet_preds <- predict(Model1_fit, newdata = validationdata2)
+# merge predicted Monthly Income variable to the CompSet file
+mergedataMonthlyIncomeCompSet <- merge(MonthlyIncomeCompSet$ID, MonthlyIncomeCompSet_preds, by=0, all=TRUE) 
+dim(mergedataMonthlyIncomeCompSet)
+head(mergedataMonthlyIncomeCompSet,2)
+# renaming the merged variable names
+colnames(mergedataMonthlyIncomeCompSet)[colnames(mergedataMonthlyIncomeCompSet)=="Row.names"] <- "RowNumber"
+colnames(mergedataMonthlyIncomeCompSet)[colnames(mergedataMonthlyIncomeCompSet)=="x"] <- "ID"
+colnames(mergedataMonthlyIncomeCompSet)[colnames(mergedataMonthlyIncomeCompSet)=="y"] <- "MonthlyIncome"
+predictMonthlyIncomeCompSet <- mergedataMonthlyIncomeCompSet[order(mergedataMonthlyIncomeCompSet$ID),] %>% dplyr::select(ID, MonthlyIncome)
+dim(predictMonthlyIncomeCompSet)
+head(predictMonthlyIncomeCompSet,2)
+# write to csv file for predicting dataset for the "Competition Set" on Monthly Income
+write.csv(predictMonthlyIncomeCompSet, file = "Case2PredictionsSalary.csv", row.names=FALSE)
 
 
 
